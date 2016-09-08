@@ -398,7 +398,7 @@ namespace OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers
         {
             Dictionary<String, Dictionary<String, String>> result = null;
 
-            if (directory.MetadataMappingFile != null)
+            if (!string.IsNullOrEmpty(directory.MetadataMappingFile))
             {
                 var metadataPropertiesStream = directory.ParentTemplate.Connector.GetFileStream(directory.MetadataMappingFile);
                 if (metadataPropertiesStream != null)
