@@ -10,6 +10,8 @@ using Field = OfficeDevPnP.Core.Framework.Provisioning.Model.Field;
 using SPField = Microsoft.SharePoint.Client.Field;
 using OfficeDevPnP.Core.Diagnostics;
 using System.Text.RegularExpressions;
+using System.Web;
+using System.Xml;
 using OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers.Extensions;
 using System.Xml.XPath;
 using OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers.TokenDefinitions;
@@ -82,6 +84,7 @@ namespace OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers
         private void UpdateField(Web web, string fieldId, XElement templateFieldElement, PnPMonitoredScope scope, TokenParser parser, string originalFieldXml)
         {
             var existingField = web.Fields.GetById(Guid.Parse(fieldId));
+
             web.Context.Load(existingField, f => f.SchemaXml);
             web.Context.ExecuteQueryRetry();
 
@@ -273,6 +276,25 @@ namespace OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers
             if (IsFieldXmlValid(fieldXml, parser, web.Context))
             {
                 var field = web.Fields.AddFieldAsXml(fieldXml, false, AddFieldOptions.AddFieldInternalNameHint);
+                web.Context.Load(field, f => f.TypeAsString, f => f.DefaultValue, f => f.InternalName, f => f.Title);
+
+                web.Context.ExecuteQueryRetry();
+
+                //Get the values for the field
+                var xmlDoc = new XmlDocument();
+                xmlDoc.LoadXml(fieldXml);
+                var fieldElement = xmlDoc.DocumentElement;
+                var fieldDisplayName = fieldElement?.Attributes["DisplayName"].Value;
+                var fieldInternalName = fieldElement?.Attributes["Name"].Value;
+
+                field = web.Fields.GetByInternalNameOrTitle(fieldInternalName);
+
+                if (!string.IsNullOrEmpty(fieldDisplayName))
+                {
+                    field.Title = fieldDisplayName;
+                    field.Update();//UpdateAndPushChanges(true);
+                }
+
                 web.Context.Load(field, f => f.TypeAsString, f => f.DefaultValue, f => f.InternalName, f => f.Title);
                 web.Context.ExecuteQueryRetry();
 
