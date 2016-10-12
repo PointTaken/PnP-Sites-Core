@@ -421,7 +421,7 @@ namespace OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers
 
             var files = directory.ParentTemplate.Connector.GetFiles(directory.Src);
 
-            if (!String.IsNullOrEmpty(directory.IncludedExtensions))
+            if (!String.IsNullOrEmpty(directory.IncludedExtensions) && directory.IncludedExtensions != "*.*")
             {
                 var includedExtensions = directory.IncludedExtensions.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
                 files = files.Where(f => includedExtensions.Contains($"*{Path.GetExtension(f).ToLower()}")).ToList();
