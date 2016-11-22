@@ -56,15 +56,18 @@ namespace Microsoft.SharePoint.Client
             tenant.Context.Load(op, i => i.IsComplete, i => i.PollingInterval);
             tenant.Context.ExecuteQueryRetry();
 
-            if (wait)
-            {
-                WaitForIsComplete(tenant, op);
-            }
-
             // Get site guid and return. If we create the site asynchronously, return an empty guid as we cannot retrieve the site by URL yet.
             Guid siteGuid = Guid.Empty;
+
             if (wait)
             {
+                // Let's poll for site collection creation completion
+                WaitForIsComplete(tenant, op);
+
+                // Add delay to avoid race conditions
+                Thread.Sleep(30 * 1000);
+
+                // Return site guid of created site collection
                 siteGuid = tenant.GetSiteGuidByUrl(new Uri(properties.Url));
             }
             return siteGuid;
@@ -411,6 +414,7 @@ namespace Microsoft.SharePoint.Client
         /// <param name="storageWarningLevel"></param>
         /// <param name="userCodeMaximumLevel"></param>
         /// <param name="userCodeWarningLevel"></param>
+        /// <param name="noScriptSite"></param>
         public static void SetSiteProperties(this Tenant tenant, string siteFullUrl,
             string title = null,
             bool? allowSelfServiceUpgrade = null,
@@ -418,7 +422,8 @@ namespace Microsoft.SharePoint.Client
             long? storageMaximumLevel = null,
             long? storageWarningLevel = null,
             double? userCodeMaximumLevel = null,
-            double? userCodeWarningLevel = null
+            double? userCodeWarningLevel = null,
+            bool? noScriptSite = null
             )
         {
             var siteProps = tenant.GetSitePropertiesByUrl(siteFullUrl, true);
@@ -440,6 +445,8 @@ namespace Microsoft.SharePoint.Client
                     siteProps.UserCodeWarningLevel = userCodeWarningLevel.Value;
                 if (title != null)
                     siteProps.Title = title;
+                if (noScriptSite != null)
+                    siteProps.DenyAddAndCustomizePages = (noScriptSite == true ? DenyAddAndCustomizePagesStatus.Enabled : DenyAddAndCustomizePagesStatus.Disabled);
 
                 siteProps.Update();
                 tenant.Context.ExecuteQueryRetry();

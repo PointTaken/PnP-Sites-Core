@@ -101,6 +101,7 @@ namespace Microsoft.SharePoint.Client
                     }
                     else
                     {
+                        Log.Error(Constants.LOGGING_SOURCE, CoreResources.ClientContextExtensions_ExecuteQueryRetryException, wex.ToString());
                         throw;
                     }
                 }
@@ -206,6 +207,7 @@ namespace Microsoft.SharePoint.Client
             bool hasMinimalVersion = false;
             try
             {
+                clientContext.ExecuteQueryRetry();
                 hasMinimalVersion = clientContext.ServerLibraryVersion.CompareTo(minimallyRequiredVersion) >= 0;
             }
             catch (PropertyOrFieldNotInitializedException)
