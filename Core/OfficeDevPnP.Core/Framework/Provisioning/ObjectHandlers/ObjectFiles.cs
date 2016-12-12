@@ -79,7 +79,7 @@ namespace OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers
 
                             using (var stream = GetFileStream(template, file))
                             {
-                                targetFile = UploadFile(template, file, folder, stream);
+                                targetFile = UploadFile(template, file, folder, stream);    
                             }
                         }
                         else
@@ -92,7 +92,7 @@ namespace OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers
                         using (var stream = GetFileStream(template, file))
                         {
                             scope.LogDebug(CoreResources.Provisioning_ObjectHandlers_Files_Uploading_file__0_, file.Src);
-                            targetFile = UploadFile(template, file, folder, stream);
+                            targetFile =    UploadFile(template, file, folder, stream);
                         }
 
                         checkedOut = CheckOutIfNeeded(web, targetFile);
@@ -530,10 +530,12 @@ namespace OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers
             if (directory.Recursive)
             {
                 var subFolders = directory.ParentTemplate.Connector.GetFolders(directory.Src);
+                var parentSrc = directory.Src;
+                var parentFolder = directory.Folder;
                 foreach (var folder in subFolders)
                 {
-                    directory.Src += @"\" + folder;
-                    directory.Folder += @"\" + folder;
+                    directory.Src = parentSrc + @"\" + folder;
+                    directory.Folder = parentFolder + @"\" + folder;
                     result.AddRange(directory.GetDirectoryFiles(metadataProperties));
                 }
             }
