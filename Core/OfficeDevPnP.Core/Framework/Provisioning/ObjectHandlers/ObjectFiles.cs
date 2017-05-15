@@ -541,6 +541,7 @@ namespace OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers
 
             if (directory.Recursive)
             {
+
                 var subFolders = directory.ParentTemplate.Connector.GetFolders(folderToGrabFilesFrom);
                 var parentFolder = directory;
                 foreach (var folder in subFolders)
