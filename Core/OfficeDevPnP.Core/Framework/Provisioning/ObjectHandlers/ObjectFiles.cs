@@ -52,8 +52,10 @@ namespace OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers
                 var currentFileIndex = 0;
                 foreach (var file in filesToProcess)
                 {
+                    var targetFileName = !String.IsNullOrEmpty(file.TargetFileName) ? file.TargetFileName : file.Src;
+
                     currentFileIndex++;
-                    WriteMessage($"File|{file.Src}|{currentFileIndex}|{filesToProcess.Length}", ProvisioningMessageType.Progress);
+                    WriteMessage($"File|{targetFileName}|{currentFileIndex}|{filesToProcess.Length}", ProvisioningMessageType.Progress);
                     var folderName = parser.ParseString(file.Folder);
 
                     if (folderName.ToLower().StartsWith((web.ServerRelativeUrl.ToLower())))
@@ -61,10 +63,10 @@ namespace OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers
                         folderName = folderName.Substring(web.ServerRelativeUrl.Length);
                     }
 
-                    if (SkipFile(isNoScriptSite, file.Src, folderName))
+                    if (SkipFile(isNoScriptSite, targetFileName, folderName))
                     {
                         // add log message
-                        scope.LogWarning(CoreResources.Provisioning_ObjectHandlers_Files_SkipFileUpload, file.Src, folderName);
+                        scope.LogWarning(CoreResources.Provisioning_ObjectHandlers_Files_SkipFileUpload, targetFileName, folderName);
                         continue;
                     }
 
@@ -72,13 +74,13 @@ namespace OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers
 
                     var checkedOut = false;
 
-                    var targetFile = folder.GetFile(template.Connector.GetFilenamePart(file.Src));
+                    var targetFile = folder.GetFile(template.Connector.GetFilenamePart(targetFileName));
 
                     if (targetFile != null)
                     {
                         if (file.Overwrite)
                         {
-                            scope.LogDebug(CoreResources.Provisioning_ObjectHandlers_Files_Uploading_and_overwriting_existing_file__0_, file.Src);
+                            scope.LogDebug(CoreResources.Provisioning_ObjectHandlers_Files_Uploading_and_overwriting_existing_file__0_, targetFileName);
                             checkedOut = CheckOutIfNeeded(web, targetFile);
 
                             using (var stream = GetFileStream(template, file))
@@ -95,8 +97,13 @@ namespace OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers
                     {
                         using (var stream = GetFileStream(template, file))
                         {
+<<<<<<< HEAD
                             scope.LogDebug(CoreResources.Provisioning_ObjectHandlers_Files_Uploading_file__0_, file.Src);
                             targetFile =    UploadFile(template, file, folder, stream);
+=======
+                            scope.LogDebug(CoreResources.Provisioning_ObjectHandlers_Files_Uploading_file__0_, targetFileName);
+                            targetFile = UploadFile(template, file, folder, stream);
+>>>>>>> upstream/master
                         }
 
                         checkedOut = CheckOutIfNeeded(web, targetFile);
@@ -126,7 +133,7 @@ namespace OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers
                                     scope.LogDebug(CoreResources.Provisioning_ObjectHandlers_Files_Adding_webpart___0___to_page, webPart.Title);
                                     var wpEntity = new WebPartEntity();
                                     wpEntity.WebPartTitle = parser.ParseString(webPart.Title);
-                                    wpEntity.WebPartXml = parser.ParseString(webPart.Contents).Trim(new[] { '\n', ' ' });
+                                    wpEntity.WebPartXml = parser.ParseXmlString(webPart.Contents).Trim(new[] { '\n', ' ' });
                                     wpEntity.WebPartZone = webPart.Zone;
                                     wpEntity.WebPartIndex = (int)webPart.Order;
                                     var wpd = web.AddWebPartToWebPartPage(targetFile.ServerRelativeUrl, wpEntity);
@@ -188,7 +195,7 @@ namespace OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers
 
                 }
             }
-            WriteMessage("Done processing files",ProvisioningMessageType.Completed);
+            WriteMessage("Done processing files", ProvisioningMessageType.Completed);
             return parser;
         }
 
@@ -197,8 +204,9 @@ namespace OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers
             var checkedOut = false;
             try
             {
-                web.Context.Load(targetFile, f => f.CheckOutType, f => f.ListItemAllFields.ParentList.ForceCheckout);
-                web.Context.ExecuteQueryRetry();
+                web.Context.Load(targetFile, f => f.CheckOutType, f => f.CheckedOutByUser, f => f.ListItemAllFields.ParentList.ForceCheckout);
+                web.Context.ExecuteQueryRetry();                
+
                 if (targetFile.ListItemAllFields.ServerObjectIsNull.HasValue
                     && !targetFile.ListItemAllFields.ServerObjectIsNull.Value
                     && targetFile.ListItemAllFields.ParentList.ForceCheckout)
@@ -389,7 +397,7 @@ namespace OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers
 
             foreach (var list in lists)
             {
-                xml = Regex.Replace(xml, list.Id.ToString(), $"{{listid:{list.Title}}}", RegexOptions.IgnoreCase);
+                xml = Regex.Replace(xml, list.Id.ToString(), $"{{listid:{System.Security.SecurityElement.Escape(list.Title)}}}", RegexOptions.IgnoreCase);
             }
             xml = Regex.Replace(xml, web.Id.ToString(), "{siteid}", RegexOptions.IgnoreCase);
             if (web.ServerRelativeUrl != "/")
@@ -427,16 +435,26 @@ namespace OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers
         private static File UploadFile(ProvisioningTemplate template, Model.File file, Microsoft.SharePoint.Client.Folder folder, Stream stream)
         {
             File targetFile = null;
-            var fileName = template.Connector.GetFilenamePart(file.Src);
+            var fileName = !String.IsNullOrEmpty(file.TargetFileName) ? file.TargetFileName : template.Connector.GetFilenamePart(file.Src);
             try
             {
                 targetFile = folder.UploadFile(fileName, stream, file.Overwrite);
             }
-            catch (Exception)
+            catch (ServerException ex)
             {
-                //The file name might contain encoded characters that prevent upload. Decode it and try again.
-                fileName = WebUtility.UrlDecode(fileName);
-                targetFile = folder.UploadFile(fileName, stream, file.Overwrite);
+                if (ex.ServerErrorCode != -2130575306) //Error code: -2130575306 = The file is already checked out.
+                {
+                    //The file name might contain encoded characters that prevent upload. Decode it and try again.
+                    fileName = WebUtility.UrlDecode(fileName);
+                    try
+                    {
+                        targetFile = folder.UploadFile(fileName, stream, file.Overwrite);
+                    }
+                    catch(Exception)
+                    {
+                        //unable to Upload file, just ignore
+                    }                    
+                }             
             }
             return targetFile;
         }
@@ -460,7 +478,26 @@ namespace OfficeDevPnP.Core.Framework.Provisioning.ObjectHandlers
             {
                 if (!String.IsNullOrEmpty(template.Connector.GetContainer()))
                 {
-                    container = $@"{template.Connector.GetContainer()}\{container}";
+                    if (container.StartsWith("/"))
+                    {
+                        container = container.TrimStart("/".ToCharArray());
+                    }
+
+                    if (template.Connector.GetType() == typeof(Connectors.AzureStorageConnector))
+                    {
+                        if (template.Connector.GetContainer().EndsWith("/"))
+                        {
+                            container = $@"{template.Connector.GetContainer()}{container}";
+                        }
+                        else
+                        {
+                            container = $@"{template.Connector.GetContainer()}/{container}";
+                        }
+                    }
+                    else
+                    {
+                        container = $@"{template.Connector.GetContainer()}\{container}";
+                    }
                 }
             }
             else
